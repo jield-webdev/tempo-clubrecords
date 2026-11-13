@@ -12,7 +12,7 @@ so replacing the code does not replace the archive. No separate database server 
 
 ## 1. Prepare the server
 
-Install **Node.js 24 LTS** and npm system-wide using your preferred Node installation method. The application requires
+Install **Node.js 26 LTS** and npm system-wide using your preferred Node installation method. The application requires
 at least Node 22.13; the distribution's default `nodejs` package may be older. Check the installed version and path:
 
 ```sh

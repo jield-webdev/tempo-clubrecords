@@ -30,17 +30,17 @@ swimmer data in a public repository.
 
 ## Prepare the Linux server once
 
-Follow the [Linux guide](deployment.md) for Node 24, Nginx, HTTPS, the `tempo` service account, the production `.env` and
+Follow the [Linux guide](deployment.md) for Node 26, Nginx, HTTPS, the `tempo` service account, the production `.env` and
 database migration. This automation uses a release layout instead of the guide's direct source copy. In the commands
-below, `deploy` is a separate SSH login account; create it if needed. Install `git`, `curl` and `util-linux` as well.
+below, `tempo` is a separate SSH login account; create it if needed. Install `git`, `curl` and `util-linux` as well.
 
 For an existing direct installation, stop the service and move `/opt/tempo-clubrecords` to
 `/opt/tempo-clubrecords-before-actions` first. Preserve its `.env`; the database remains in `/var/lib/tempo-clubrecords`.
 
 ```sh
-sudo install -d -o deploy -g deploy -m 0755 /opt/tempo-clubrecords
-sudo install -d -o deploy -g deploy -m 0755 /opt/tempo-clubrecords/releases
-sudo -u deploy git clone git@github.com:YOUR-ORG/YOUR-REPO.git /opt/tempo-clubrecords/repository
+sudo install -d -o tempo -g tempo -m 0755 /opt/tempo-clubrecords
+sudo install -d -o tempo -g tempo -m 0755 /opt/tempo-clubrecords/releases
+sudo -u tempo git clone git@github.com:jield-webdev/tempo-clubrecords.git /opt/tempo-clubrecords/repository
 
 # For an existing installation; otherwise create .env using the Linux guide.
 sudo install -o tempo -g tempo -m 0600 /opt/tempo-clubrecords-before-actions/.env /opt/tempo-clubrecords/.env

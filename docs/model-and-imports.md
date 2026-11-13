@@ -4,26 +4,26 @@
 
 ```mermaid
 erDiagram
-    strokes ||--o{ disciplines : stroke
-    distances ||--o{ disciplines : distance_per_leg
-    disciplines ||--o{ record_slots : event
-    categories ||--o{ record_slots : category
-    swimmers ||--o{ swimmer_identifiers : stable_identity
-    swimmers ||--o{ results : individual_swimmer
-    uploads ||--o{ meet_versions : original_file
-    meets ||--o{ meet_versions : revisions
-    meet_versions ||--o{ results : snapshot
-    uploads ||--o{ results : provenance
-    results ||--o{ relay_members : team
-    swimmers ||--o{ relay_members : swimmer
-    results ||--o{ splits : cumulative_times
-    results ||--o{ result_categories : eligible_for
-    record_slots ||--o{ result_categories : classification
-    record_slots ||--o{ record_progress : timeline
-    results ||--o{ record_progress : performance
-    uploads ||--o{ seed_rows : source_cells
-    seed_rows ||--o{ seed_row_results : source_link
-    results ||--o{ seed_row_results : performance
+    strokes ||--o{ disciplines: stroke
+    distances ||--o{ disciplines: distance_per_leg
+    disciplines ||--o{ record_slots: event
+    categories ||--o{ record_slots: category
+    swimmers ||--o{ swimmer_identifiers: stable_identity
+    swimmers ||--o{ results: individual_swimmer
+    uploads ||--o{ meet_versions: original_file
+    meets ||--o{ meet_versions: revisions
+    meet_versions ||--o{ results: snapshot
+    uploads ||--o{ results: provenance
+    results ||--o{ relay_members: team
+    swimmers ||--o{ relay_members: swimmer
+    results ||--o{ splits: cumulative_times
+    results ||--o{ result_categories: eligible_for
+    record_slots ||--o{ result_categories: classification
+    record_slots ||--o{ record_progress: timeline
+    results ||--o{ record_progress: performance
+    uploads ||--o{ seed_rows: source_cells
+    seed_rows ||--o{ seed_row_results: source_link
+    results ||--o{ seed_row_results: performance
 ```
 
 `disciplines` distinguishes stroke, per-swimmer distance, number of swimmers and special composition variant. Gender belongs to the result/record slot. A 4×100 medley, an individual 400 medley and an 8×50 mixed-age freestyle format are different disciplines even if total distances match.
