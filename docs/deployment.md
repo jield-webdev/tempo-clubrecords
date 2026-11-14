@@ -134,7 +134,7 @@ sudo cp deploy/tempo-clubrecords.service /etc/systemd/system/tempo-clubrecords.s
 sudo systemctl daemon-reload
 sudo systemctl enable --now tempo-clubrecords
 sudo systemctl status tempo-clubrecords --no-pager
-curl --fail http://127.0.0.1:3000/api/health
+curl --fail http://127.0.0.1:3001/api/health
 ```
 
 The health endpoint should return `{"ok":true}`. The service runs without root privileges, restarts after failures,
@@ -226,7 +226,7 @@ sudo install -o tempo -g tempo -m 0600 \
 cd /opt/tempo-clubrecords
 sudo -u tempo npm run cli -- admin:set-password
 sudo systemctl start tempo-clubrecords
-curl --fail http://127.0.0.1:3000/api/health
+curl --fail http://127.0.0.1:3001/api/health
 ```
 
 The old WAL/SHM files must not be reused with a restored database. Resetting the admin password invalidates sessions

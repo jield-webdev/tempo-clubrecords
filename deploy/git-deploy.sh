@@ -10,6 +10,16 @@ sha=${1:-}
   exit 1
 }
 
+# Check the service permissions before building or changing the active release.
+# -l checks policy without actually restarting/stopping the running service.
+for action in restart stop; do
+  if ! sudo -n -l /usr/bin/systemctl "$action" tempo-clubrecords.service >/dev/null; then
+    echo "Deployment user $(id -un) cannot check sudo permission for systemctl $action tempo-clubrecords.service." >&2
+    echo 'Configure passwordless service commands for this user; see docs/github-actions.md.' >&2
+    exit 1
+  fi
+done
+
 # Also serialize manual deployments with Actions deployments.
 exec 9>"$root/.deploy.lock"
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
