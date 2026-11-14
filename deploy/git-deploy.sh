@@ -74,7 +74,7 @@ switch_to "$release"
 switched=true
 sudo -n /usr/bin/systemctl restart tempo-clubrecords.service
 for attempt in {1..30}; do
-  if curl --fail --silent --show-error --max-time 2 http://127.0.0.1:3000/api/health; then
+  if curl --fail --silent --show-error --max-time 2 http://127.0.0.1:3001/api/health; then
     echo "Deployed $sha"
     exit 0
   fi
