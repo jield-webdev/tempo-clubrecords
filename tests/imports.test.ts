@@ -11,7 +11,7 @@ import { all, one, openDb, type Db } from '../src/server/db.ts';
 import { eligibleCategories, ageOnRaceYear, parseTime } from '../src/server/domain.ts';
 import { importExcel } from '../src/server/importers/excel.ts';
 import { decodeLenex, importLenex } from '../src/server/importers/lenex.ts';
-import { records } from '../src/server/queries.ts';
+import { records, results, history, meta, swimmers } from '../src/server/queries.ts';
 import { setPassword } from '../src/server/auth.ts';
 import { createApp } from '../src/server/app.ts';
 
@@ -46,6 +46,8 @@ afterEach(async () => {
   }
 });
 function fixture({
+  course = 'SCM',
+  sessionCourse = '',
   number = '1',
   date = '2026-01-10',
   time = '00:00:40.00',
@@ -58,7 +60,7 @@ function fixture({
   empty = false,
 } = {}) {
   return Buffer.from(
-    `<?xml version="1.0"?><LENEX version="3.0"><MEETS><MEET name="Testwedstrijd" number="${number}" nation="NED" city="Valkenswaard" course="SCM"><SESSIONS><SESSION date="${date}" number="1"><EVENTS><EVENT eventid="1" number="1" round="TIM" gender="M" daytime="10:00"><SWIMSTYLE distance="50" relaycount="1" stroke="${stroke}"/></EVENT></EVENTS></SESSION></SESSIONS><CLUBS><CLUB code="${club}" name="Tempo"><ATHLETES><ATHLETE athleteid="1" firstname="${name}" lastname="Zwemmer" gender="M" birthdate="2010-12-06" license="${license}"><RESULTS>${empty ? '' : `<RESULT resultid="1" eventid="1" swimtime="${time}" ${status ? `status="${status}"` : ''}>${split ? `<SPLITS><SPLIT distance="25" swimtime="${split}"/></SPLITS>` : ''}</RESULT>`}</RESULTS></ATHLETE></ATHLETES></CLUB></CLUBS></MEET></MEETS></LENEX>`,
+    `<?xml version="1.0"?><LENEX version="3.0"><MEETS><MEET name="Testwedstrijd" number="${number}" nation="NED" city="Valkenswaard" course="${course}"><SESSIONS><SESSION date="${date}" number="1" ${sessionCourse ? `course="${sessionCourse}"` : ''}><EVENTS><EVENT eventid="1" number="1" round="TIM" gender="M" daytime="10:00"><SWIMSTYLE distance="50" relaycount="1" stroke="${stroke}"/></EVENT></EVENTS></SESSION></SESSIONS><CLUBS><CLUB code="${club}" name="Tempo"><ATHLETES><ATHLETE athleteid="1" firstname="${name}" lastname="Zwemmer" gender="M" birthdate="2010-12-06" license="${license}"><RESULTS>${empty ? '' : `<RESULT resultid="1" eventid="1" swimtime="${time}" ${status ? `status="${status}"` : ''}>${split ? `<SPLITS><SPLIT distance="25" swimtime="${split}"/></SPLITS>` : ''}</RESULT>`}</RESULTS></ATHLETE></ATHLETES></CLUB></CLUBS></MEET></MEETS></LENEX>`,
   );
 }
 const activeTimes = async (d: Db) =>
@@ -477,3 +479,99 @@ it.skipIf(!process.env.TEST_MYSQL_URL)(
     }
   },
 );
+
+describe('Independent course records', () => {
+  it('separates slower long-course records, history, corrections, and filters from the short-course seed', async () => {
+    const d = await db();
+    await importExcel(d, await workbook(), 'seed.xlsx');
+    expect((await records(d, { course: 'SCM' })).rows[0].course).toBe('SCM');
+    expect((await records(d, { course: 'LCM' })).total).toBe(0);
+    await importLenex(
+      d,
+      fixture({ number: '2', date: '2026-02-10', course: 'LCM', time: '00:00:45.00' }),
+      'long.lef',
+    );
+    await importLenex(
+      d,
+      fixture({ number: '3', date: '2026-03-10', sessionCourse: 'LCM', time: '00:00:43.00' }),
+      'session.lef',
+    );
+    const short = (await records(d, { course: 'SCM', category: 'AGE_16' })).rows;
+    const long = (await records(d, { course: 'LCM', category: 'AGE_16' })).rows;
+    expect(short.map((r) => r.time_cs)).toEqual([4000]);
+    expect(long.map((r) => r.time_cs)).toEqual([4300]);
+    expect((await history(d, long[0].slot_id, 'LCM')).map((r) => r.time_cs)).toEqual([4300, 4500]);
+    expect((await history(d, short[0].slot_id, 'SCM')).map((r) => r.time_cs)).toEqual([4000]);
+    expect((await results(d, { course: 'LCM' })).total).toBe(2);
+    expect((await meta(d)).stats.records).toBe(3);
+    expect((await swimmers(d))[0].record_count).toBe(3);
+    await importLenex(
+      d,
+      fixture({ number: '3', date: '2026-03-10', sessionCourse: 'LCM', status: 'DSQ' }),
+      'corrected.lef',
+    );
+    expect((await records(d, { course: 'LCM' })).rows.map((r) => r.time_cs)).toEqual([4500, 4500]);
+    expect((await records(d, { course: 'SCM' })).rows.map((r) => r.time_cs)).toEqual([4000]);
+    const app = await createApp(d);
+    try {
+      expect(
+        (await app.inject(`/api/records/${long[0].slot_id}/history?course=LCM`))
+          .json()
+          .map((r: any) => r.course),
+      ).toEqual(['LCM']);
+      expect((await app.inject('/api/records?course=SCM')).json().total).toBe(1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('keeps equal times and official splits independent for each course', async () => {
+    const d = await db();
+    await importLenex(d, fixture({ split: '00:00:20.00' }), 'short.lef');
+    const imported = await importLenex(
+      d,
+      fixture({ number: '2', course: 'LCM', split: '00:00:20.00' }),
+      'long.lef',
+    );
+    expect(imported.newRecords).toBe(4);
+    for (const course of ['SCM', 'LCM']) {
+      const rows = (await records(d, { course })).rows;
+      expect(rows).toHaveLength(4);
+      expect(rows.every((r) => r.course === course && r.change_type === 'first')).toBe(true);
+    }
+  });
+
+  it('upgrades existing archives once and preserves uploaded source bytes', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tempo-course-upgrade-'));
+    const path = join(dir, 'archive.sqlite');
+    let archive = await openDb(path);
+    try {
+      const bytes = await workbook();
+      await importExcel(archive, bytes, 'seed.xlsx');
+      await importLenex(archive, fixture({ course: 'LCM', time: '00:00:45.00' }), 'long.lef');
+      await archive.exec(
+        "UPDATE results SET course='UNKNOWN' WHERE source_kind='seed'; DELETE FROM settings WHERE key='course_records_v1'; DELETE FROM record_progress;",
+      );
+      await archive.close();
+      archive = await openDb(path);
+      expect((await records(archive, { course: 'SCM' })).total).toBe(1);
+      expect((await records(archive, { course: 'LCM' })).total).toBe(2);
+      expect(
+        Buffer.from(
+          (await one(archive, "SELECT content FROM uploads WHERE kind='excel'"))!.content,
+        ),
+      ).toEqual(bytes);
+      const revision = (await one(archive, "SELECT value FROM settings WHERE key='data_revision'"))!
+        .value;
+      await archive.close();
+      archive = await openDb(path);
+      expect(
+        (await one(archive, "SELECT value FROM settings WHERE key='data_revision'"))!.value,
+      ).toBe(revision);
+      expect(await all(archive, 'PRAGMA foreign_key_check')).toEqual([]);
+    } finally {
+      await archive.close();
+      rmSync(dir, { recursive: true });
+    }
+  });
+});

@@ -117,7 +117,7 @@ export async function importExcel(
 
     if (options.reset) await clearSportData(db);
     const warnings: string[] = [
-      'Het Excel-bestand vermeldt geen badlengte. Startrecords behouden badlengte onbekend; clubrecords worden over badlengtes heen vergeleken.',
+      'Alle startrecords uit Excel worden als korte baan (25m, SCM) ingedeeld.',
     ];
     const uploadId = await insert(
       db,
@@ -249,7 +249,7 @@ export async function importExcel(
               resultId = await insert(
                 db,
                 `INSERT INTO results(upload_id,discipline_id,swimmer_id,gender,race_date,date_label,course,time_cs,status,event_key,source_kind,comment)
-                VALUES (?,?,?,?,?,?,'UNKNOWN',?,'OK',?,'seed',?)`,
+                VALUES (?,?,?,?,?,?,'SCM',?,'OK',?,'seed',?)`,
                 uploadId,
                 a.id,
                 who,

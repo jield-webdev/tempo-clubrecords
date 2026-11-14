@@ -72,10 +72,18 @@ export async function createApp(db: Db, { frontend = false, logger = false } = {
   app.get('/api/meta', async () => await query.meta(db));
   app.get('/api/records', async (req) => await query.records(db, params(req.query)));
   app.get('/api/results', async (req) => await query.results(db, params(req.query)));
-  app.get('/api/history', async () => await query.history(db));
+  app.get(
+    '/api/history',
+    async (req) => await query.history(db, undefined, params(req.query).course),
+  );
   app.get<{ Params: { id: string } }>(
     '/api/records/:id/history',
-    async (req) => await query.history(db, z.coerce.number().int().positive().parse(req.params.id)),
+    async (req) =>
+      await query.history(
+        db,
+        z.coerce.number().int().positive().parse(req.params.id),
+        params(req.query).course,
+      ),
   );
   app.get('/api/swimmers', async (req) => await query.swimmers(db, params(req.query).q));
   app.get<{ Params: { id: string } }>(

@@ -76,6 +76,12 @@ export async function migrateSqlite(target: Db, sourcePath: string) {
       await target
         .prepare('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)')
         .run('data_revision', '0');
+      await target.prepare("UPDATE results SET course='SCM' WHERE source_kind='seed'").run();
+      const { rebuildRecords } = await import('./domain.ts');
+      await rebuildRecords(target);
+      await target
+        .prepare('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)')
+        .run('course_records_v1', '1');
     });
     source.exec('ROLLBACK');
     return counts;

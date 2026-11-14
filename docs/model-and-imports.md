@@ -28,7 +28,7 @@ erDiagram
 
 `disciplines` distinguishes stroke, per-swimmer distance, number of swimmers and special composition variant. Gender belongs to the result/record slot. A 4×100 medley, an individual 400 medley and an 8×50 mixed-age freestyle format are different disciplines even if total distances match.
 
-`categories` has data-driven age bounds rather than an age column on every result. `record_slots` is the unique combination of discipline, category and gender. `result_categories` lets one result qualify for several slots. `record_progress` is a rebuildable projection of normalized results and classifications; it is not an independent editable claim.
+`categories` has data-driven age bounds rather than an age column on every result. `record_slots` is the unique combination of discipline, category and gender. `result_categories` lets one result qualify for several slots. `record_progress` is a rebuildable projection of normalized results and classifications; it is not an independent editable claim. Each slot has separate timelines and current records for `SCM` (25m) and `LCM` (50m), partitioned by `results.course`. History requests use both slot ID and course. All Excel baselines are classified as SCM.
 
 `swimmer_identifiers` separates stable license/Swimrankings IDs from export-local athlete IDs. Matching preference is stable ID, then one unambiguous normalized name/gender/birth-date match. Conflicting stable IDs or dates abort the import. Unknown Excel birthdays remain null. The raw LENEX athlete IDs are used only to resolve that document's relay references.
 

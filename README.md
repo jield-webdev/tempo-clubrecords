@@ -115,11 +115,10 @@ and the month of the meet do not affect classification. Individual record catego
 
 Important preservation decisions:
 
-- **Pool length:** Excel does not identify a pool course. Seed performances therefore retain `UNKNOWN`. The club
-  recordbook combines meter courses, matching the workbook's single register. LENEX results retain SCM/LCM separately,
-  and the results page can filter them. Yards/unknown-course imports are stored but excluded from automatic meter-record
-  eligibility. Separate short-/long-course recordbooks would require a club policy decision and classification of the
-  legacy records.
+- **Pool length:** Records and their histories are calculated independently for 25m (`SCM`) and 50m (`LCM`).
+  All Excel seed performances are classified as 25m. Existing archives are upgraded automatically on startup.
+  LENEX uses the session course, falling back to the meet course. Yards/unknown-course results are stored but excluded
+  from automatic meter-record eligibility. The recordbook, CSV export and results support course filters.
 - **Birth dates:** absent in Excel, so they are not invented. Each baseline belongs only to its stated category. LENEX
   birth dates and stable license/Swimrankings identifiers populate swimmers on subsequent imports.
 - **Ties:** `Vrij 25-200!K9` has Elvira den Hertog and Yanna van der Heijden with separate dates. Both are separate
@@ -205,5 +204,4 @@ federation-specific ratification requirements, handicap record classes, and summ
 club rules. Relay flying starts are never promoted into individual records.
 
 The app replays known performances, not an invented complete history: the workbook provides only current baseline
-claims. SQLite or remote MySQL and a single administrator are supported; federated admin accounts and separate course
-policies are outside this implementation. See the [deployment guide](docs/deployment.md) to host this version behind Nginx.
+claims. SQLite or remote MySQL and a single administrator are supported; federated admin accounts are outside this implementation. See the [deployment guide](docs/deployment.md) to host this version behind Nginx.

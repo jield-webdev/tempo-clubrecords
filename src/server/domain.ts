@@ -49,7 +49,7 @@ export async function assignCategories(
 /** Replay all active results in race-date order, not upload order. Rebuilding is intentional:
  * a corrected file can slow down, disqualify, or remove a former record and must restore its predecessor.
  * Workbook rows are baselines for ONLY their stated category. No birth dates are inferred from them.
- * The legacy workbook combines courses; preserve that policy while retaining SCM/LCM on every race.
+ * Each slot has independent SCM/LCM progressions, using the course stored on its results.
  */
 export async function rebuildRecords(db: Db): Promise<void> {
   await db.exec('DELETE FROM record_progress');
@@ -60,16 +60,16 @@ export async function rebuildRecords(db: Db): Promise<void> {
     FROM result_categories rc
     JOIN results r ON r.id=rc.result_id LEFT JOIN meet_versions v ON v.id=r.meet_version_id
     LEFT JOIN swimmers s ON s.id=r.swimmer_id
-    WHERE r.status='OK' AND r.time_cs>0 AND (v.id IS NULL OR v.active=1)
-    ORDER BY rc.slot_id,COALESCE(r.race_date,'0000-00-00'),COALESCE(r.race_time,'23:59:59'),
+    WHERE r.status='OK' AND r.time_cs>0 AND r.course IN ('SCM','LCM') AND (v.id IS NULL OR v.active=1)
+    ORDER BY rc.slot_id,r.course,COALESCE(r.race_date,'0000-00-00'),COALESCE(r.race_time,'23:59:59'),
       CASE WHEN r.source_kind='seed' THEN 1 ELSE 0 END,r.id`,
   );
-  let currentSlot = -1,
+  let currentSlot = '',
     best = Infinity;
   const seen = new Set<string>();
   for (const r of candidates) {
-    if (r.slot_id !== currentSlot) {
-      currentSlot = r.slot_id;
+    if (`${r.slot_id}|${r.course}` !== currentSlot) {
+      currentSlot = `${r.slot_id}|${r.course}`;
       best = Infinity;
       seen.clear();
     }
@@ -95,27 +95,27 @@ export async function rebuildRecords(db: Db): Promise<void> {
   }
   const bestTimes = await all(
     db,
-    'SELECT p.slot_id,MIN(r.time_cs) best FROM record_progress p JOIN results r ON r.id=p.result_id GROUP BY p.slot_id',
+    'SELECT p.slot_id,r.course,MIN(r.time_cs) best FROM record_progress p JOIN results r ON r.id=p.result_id GROUP BY p.slot_id,r.course',
   );
   for (const row of bestTimes)
     await db
       .prepare(
-        'UPDATE record_progress SET is_current=1 WHERE slot_id=? AND result_id IN (SELECT id FROM results WHERE time_cs=?)',
+        'UPDATE record_progress SET is_current=1 WHERE slot_id=? AND result_id IN (SELECT id FROM results WHERE time_cs=? AND course=?)',
       )
-      .run(row.slot_id, row.best);
+      .run(row.slot_id, row.best, row.course);
 }
 export async function currentRecordKeys(db: Db, uploadId?: number): Promise<Set<string>> {
   return new Set(
     (
       await all(
         db,
-        `SELECT p.slot_id,r.time_cs,
+        `SELECT p.slot_id,r.course,r.time_cs,
     ${db.dialect === 'mysql' ? `COALESCE(CAST(r.swimmer_id AS CHAR),CONCAT('relay:',COALESCE(${relayIdentity(db)},'unknown')))` : `COALESCE(CAST(r.swimmer_id AS TEXT),'relay:'||COALESCE(${relayIdentity(db)},'unknown'))`} identity,
     COALESCE(r.race_date,r.date_label) date
     FROM record_progress p JOIN results r ON r.id=p.result_id LEFT JOIN swimmers s ON s.id=r.swimmer_id WHERE is_current=1 ${uploadId ? 'AND r.upload_id=?' : ''}`,
         ...(uploadId ? [uploadId] : []),
       )
-    ).map((r) => `${r.slot_id}|${r.time_cs}|${r.identity}|${r.date}`),
+    ).map((r) => `${r.slot_id}|${r.course}|${r.time_cs}|${r.identity}|${r.date}`),
   );
 }
 export const getTeamCode = async (db: Db): Promise<string> =>

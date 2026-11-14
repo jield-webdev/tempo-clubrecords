@@ -2210,3 +2210,9 @@ dialog::backdrop {
     opacity: 0.4;
   }
 }
+
+footer { flex-wrap: wrap; gap: 12px 20px; }
+.developer-credit { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; font-size: 10px; }
+.developer-credit img { display: block; object-fit: contain; }
+.developer-credit:hover { color: var(--brand-strong); }
+.developer-credit:focus-visible { outline: 2px solid var(--brand-strong); outline-offset: 4px; }

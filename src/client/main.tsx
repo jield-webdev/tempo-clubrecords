@@ -208,7 +208,7 @@ function App() {
                 <a href="#records" className="brand" aria-label="Tempo Valkenswaard, clubrecords">
                     <ClubLogo/>
                 </a>
-                <div className="sidebar-label">HET CLUBARCHIEF 2</div>
+                <div className="sidebar-label">HET CLUBARCHIEF</div>
                 <nav>
                     {nav.map(([id, label, Icon]) => (
                         <a
@@ -299,6 +299,9 @@ function App() {
                     )}
                 </main>
                 <footer>
+                    <a className="developer-credit" href="https://jield.dev/" target="_blank" rel="noreferrer" aria-label="developed by Jield">
+                        <span>developed by</span><img src="/jield-logo.svg" alt="Jield" width="48" height="20"/>
+                    </a>
                     <span>© {new Date().getFullYear()} Tempo Valkenswaard</span>
                     <span>
             Elke prestatie telt. <Waves size={17}/>
@@ -322,9 +325,8 @@ function App() {
                         </p>
                         <h3>Badlengte en tussentijden</h3>
                         <p>
-                            Het oorspronkelijke recordboek maakt geen onderscheid tussen korte en lange baan.
-                            Daarom vergelijken we clubrecords over badlengtes heen. De badlengte bij een resultaat
-                            blijft zichtbaar. Officiële tussentijden bij vrije slag kunnen meetellen voor kortere
+                            Clubrecords worden afzonderlijk bijgehouden voor korte baan (25m) en lange baan (50m).
+                            Alle startrecords uit Excel gelden als 25m. De badlengte bij een resultaat blijft zichtbaar. Officiële tussentijden bij vrije slag kunnen meetellen voor kortere
                             afstanden.
                         </p>
                         <h3>Een controleerbaar archief</h3>
@@ -346,6 +348,7 @@ function App() {
 
 function Records({meta, revision}: { meta: Data; revision: number }) {
     const [type, setType] = useState('individual'),
+        [course, setCourse] = useState('SCM'),
         [stroke, setStroke] = useState(''),
         [gender, setGender] = useState(''),
         [category, setCategory] = useState('ALL'),
@@ -360,12 +363,13 @@ function Records({meta, revision}: { meta: Data; revision: number }) {
         stroke,
         gender,
         category,
+        course,
         distance,
         q,
         page: String(page),
     });
     const {data, error} = useData(`/records?${params}`, revision);
-    const {data: recent} = useData('/history', revision);
+    const {data: recent} = useData(`/history?course=${course}`, revision);
 
     function update(setter: (v: any) => void, v: any) {
         setter(v);
@@ -561,6 +565,10 @@ function Records({meta, revision}: { meta: Data; revision: number }) {
                             </button>
                         )}
                     </label>
+                    <Select label="Badlengte" value={course} onChange={(v) => update(setCourse, v)}>
+                        <option value="SCM">25m</option>
+                        <option value="LCM">50m</option>
+                    </Select>
                     <Select label="Geslacht" value={gender} onChange={(v) => update(setGender, v)}>
                         <option value="">Dames & heren{type === 'relay' ? ' & gemengd' : ''}</option>
                         <option value="M">Heren</option>
@@ -640,9 +648,9 @@ function Records({meta, revision}: { meta: Data; revision: number }) {
                                                 {r.course === 'UNKNOWN'
                                                     ? 'Badlengte onbekend'
                                                     : r.course === 'SCM'
-                                                        ? '25 meter'
+                                                        ? '25m'
                                                         : r.course === 'LCM'
-                                                            ? '50 meter'
+                                                            ? '50m'
                                                             : r.course}
                                             </small>
                                         </td>
@@ -673,7 +681,7 @@ function Records({meta, revision}: { meta: Data; revision: number }) {
                 <div className="table-note">
                     <CircleHelp size={15}/>
                     <span>
-            Leeftijd = wedstrijdjaar − geboortejaar. Korte en lange baan worden samen vergeleken.
+            Leeftijd = wedstrijdjaar − geboortejaar. Records voor 25m en 50m worden afzonderlijk bijgehouden.
           </span>
                     <span className="table-note-end">
             <span className="tiny-dot"/> Actueel recordarchief
@@ -822,11 +830,12 @@ function RecordHistory({
     revision: number;
     onClose: () => void;
 }) {
-    const {data, error} = useData(`/records/${record.slot_id}/history`, revision);
+    const {data, error} = useData(`/records/${record.slot_id}/history?course=${encodeURIComponent(record.course)}`, revision);
     return (
         <Modal title={record.event} onClose={onClose}>
             <div className="history-summary">
                 <Badge>{record.category}</Badge>
+                <Badge>{record.course === 'SCM' ? '25m' : '50m'}</Badge>
                 <span>{genderLabel[record.gender]}</span>
                 {record.variant && <p>{record.variant}</p>}
             </div>
@@ -964,9 +973,9 @@ function Results({
                         }}
                     >
                         <option value="">Alle badlengtes</option>
-                        <option value="SCM">25 meter</option>
-                        <option value="LCM">50 meter</option>
-                        <option value="UNKNOWN">Onbekend (Excel)</option>
+                        <option value="SCM">25m</option>
+                        <option value="LCM">50m</option>
+                        <option value="UNKNOWN">Onbekend</option>
                     </Select>
                 </div>
                 {error ? (
@@ -1064,7 +1073,7 @@ function ResultDetail({result: r, onClose}: { result: Data; onClose: () => void 
                 <span>{r.event}</span>
                 <strong>{r.status === 'OK' ? r.time : r.status}</strong>
                 <Badge>
-                    {r.course === 'SCM' ? '25 meter' : r.course === 'LCM' ? '50 meter' : 'Badlengte onbekend'}
+                    {r.course === 'SCM' ? '25m' : r.course === 'LCM' ? '50m' : 'Badlengte onbekend'}
                 </Badge>
             </div>
             <div className="prose">
@@ -1531,8 +1540,8 @@ function Settings({meta, refresh}: { meta: Data; refresh: () => void }) {
                 </p>
                 <h3>Recordvergelijking</h3>
                 <p>
-                    Korte en lange baan worden samen vergeleken, overeenkomstig het Excel-startbestand. De
-                    badlengte wordt afzonderlijk opgeslagen.
+                    Clubrecords voor 25m (SCM) en 50m (LCM) worden afzonderlijk bijgehouden.
+                    Alle startrecords uit Excel zijn ingedeeld als 25m.
                 </p>
                 <h3>Beheerwachtwoord wijzigen</h3>
                 <p>

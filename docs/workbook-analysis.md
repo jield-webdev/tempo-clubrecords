@@ -91,6 +91,6 @@ Three baseline all-age times conflict with faster age/senior rows: men's 100m fr
 - 1,101 additional slots have no baseline time.
 - Exactly 100 normalized swimmer names occur in the seed. Historical relay members are unknown.
 - No seed swimmer receives an invented birth date or license.
-- No seed performance receives an invented pool length; every seed course is `UNKNOWN`.
+- By club policy, every seed performance is classified as short course (`SCM`, 25m).
 
 The two LXF files add 28 actual Tempo race results from two meets, including one DSQ, and populate known swimmer identities/birth dates from LENEX. Shorter-distance freestyle candidates are derived separately from retained cumulative splits. All of these counts are asserted against the real input files by the integration suite.

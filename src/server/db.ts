@@ -44,6 +44,23 @@ export async function openDb(
     await db
       .prepare('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)')
       .run('data_revision', '0');
+    // Upgrade existing archives once, without changing original uploaded bytes or eligibility.
+    if (!(await one(db, "SELECT 1 FROM settings WHERE key='course_records_v1'")))
+      await db.transaction(async () => {
+        if (await one(db, "SELECT 1 FROM settings WHERE key='course_records_v1'")) return;
+        await db.prepare("UPDATE results SET course='SCM' WHERE source_kind='seed'").run();
+        await db
+          .prepare("UPDATE uploads SET warnings=REPLACE(warnings,?,?) WHERE kind='excel'")
+          .run(
+            'Het Excel-bestand vermeldt geen badlengte. Startrecords behouden badlengte onbekend; clubrecords worden over badlengtes heen vergeleken.',
+            'Alle startrecords uit Excel worden als korte baan (25m, SCM) ingedeeld.',
+          );
+        const { rebuildRecords } = await import('./domain.ts');
+        await rebuildRecords(db);
+        await db
+          .prepare('INSERT INTO settings(key,value) VALUES (?,?)')
+          .run('course_records_v1', '1');
+      });
     return db;
   } catch (error) {
     await db.close();

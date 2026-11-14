@@ -35,7 +35,7 @@ export async function meta(db: Db) {
     stats: {
       records: (await one(
         db,
-        'SELECT COUNT(DISTINCT slot_id) n FROM record_progress WHERE is_current=1',
+        'SELECT COUNT(*) n FROM (SELECT p.slot_id,r.course FROM record_progress p JOIN results r ON r.id=p.result_id WHERE p.is_current=1 GROUP BY p.slot_id,r.course) current_slots',
       ))!.n,
       swimmers: (await one(db, 'SELECT COUNT(*) n FROM swimmers'))!.n,
       results: (await one(
@@ -54,7 +54,7 @@ export async function meta(db: Db) {
     policy: {
       age: 'Wedstrijdjaar − geboortejaar, ongeacht verjaardag.',
       courses:
-        'Clubrecords worden over badlengtes heen vergeleken, zoals in het startbestand. De oorspronkelijke badlengte blijft bij elk resultaat bewaard.',
+        'Clubrecords worden afzonderlijk bijgehouden voor 25m (SCM) en 50m (LCM). Alle startrecords uit Excel zijn 25m.',
     },
   };
 }
@@ -99,7 +99,7 @@ function filters(params: Record<string, string>, alias: string, records: boolean
     );
     args.push(Number(params.swimmer), Number(params.swimmer));
   }
-  if (!records && params.course) {
+  if (params.course) {
     where.push('r.course=?');
     args.push(params.course);
   }
@@ -152,7 +152,7 @@ export async function results(db: Db, params: Record<string, string>) {
   };
 }
 
-export async function history(db: Db, slotId?: number) {
+export async function history(db: Db, slotId?: number, course?: string) {
   const rows = await all(
     db,
     `SELECT ${resultSelect}, p.slot_id, p.previous_time_cs, p.change_type, p.is_current, c.name category, rs.gender
@@ -160,9 +160,10 @@ export async function history(db: Db, slotId?: number) {
                   JOIN results r ON r.id = p.result_id ${resultJoins}
     JOIN record_slots rs
          ON rs.id=p.slot_id JOIN categories c ON c.id=rs.category_id
-             ${slotId ? 'WHERE p.slot_id=?' : "WHERE r.source_kind<>'seed' AND p.is_current=1"}
+             ${slotId ? 'WHERE p.slot_id=?' : "WHERE r.source_kind<>'seed' AND p.is_current=1"} ${course ? 'AND r.course=?' : ''}
          ORDER BY r.race_date DESC, r.race_time DESC, r.id DESC ${slotId ? '' : 'LIMIT 12'}`,
     ...(slotId ? [slotId] : []),
+    ...(course ? [course] : []),
   );
   return Promise.all(rows.map((r) => decorate(db, r)));
 }
@@ -173,7 +174,7 @@ export async function swimmers(db: Db, q = '') {
     `SELECT s.id,
                 s.name,
                 s.gender,
-                COUNT(DISTINCT CASE WHEN p.is_current = 1 THEN p.slot_id END)                   record_count,
+                COUNT(DISTINCT CASE WHEN p.is_current = 1 THEN ${db.dialect === 'mysql' ? "CONCAT(p.slot_id,'|',r.course)" : "p.slot_id||'|'||r.course"} END)                   record_count,
                 COUNT(DISTINCT CASE WHEN r.source_kind = 'race' AND v.active = 1 THEN r.id END) result_count
          FROM swimmers s
                   LEFT JOIN results r ON r.swimmer_id = s.id
