@@ -80,7 +80,10 @@ sudo systemctl enable tempo-clubrecords.service
 curl --fail https://records.example.com/api/health
 ```
 
-The script checks `http://127.0.0.1:3000/api/health`. Update that URL in the script if you change the production port.
+The script reads `HOST` and `PORT` from the shared production `.env` and checks `/api/health`, requiring
+`{"ok":true}`. The production examples and Nginx configuration use `HOST=127.0.0.1` and `PORT=3001`;
+set these in `/opt/tempo-clubrecords/.env` and keep Nginx `proxy_pass` on the same port.
+The application defaults to port 3000 if `PORT` is absent. Wildcard listen addresses are checked via loopback.
 
 ## Configure GitHub once
 
@@ -92,7 +95,7 @@ In **Settings → Environments**, create `production`, restrict deployment branc
 | Secret               | Value                                                              |
 | -------------------- | ------------------------------------------------------------------ |
 | `DEPLOY_HOST`        | Server hostname or IP, without a URL scheme                        |
-| `DEPLOY_USER`        | `tempo` (or your chosen deployment SSH account)                     |
+| `DEPLOY_USER`        | `tempo` (or your chosen deployment SSH account)                    |
 | `DEPLOY_PORT`        | Optional SSH port; defaults to `22`                                |
 | `DEPLOY_SSH_KEY`     | Complete private SSH key, without a passphrase                     |
 | `DEPLOY_KNOWN_HOSTS` | Verified server SSH host-key entries in OpenSSH known_hosts format |
@@ -105,6 +108,37 @@ jobs run one at a time, and active deployments are not cancelled by a later push
 a newer push, so the server converges on the latest version rather than deploying every intermediate commit.
 
 ## Operations
+
+### Fix health-check 404s
+
+A successful build followed by HTTP 404 means an HTTP server answered the check, but did not serve the expected route.
+Confirm the production `.env` contains `HOST=127.0.0.1` and `PORT=3001` (or your chosen port), and that Nginx uses the
+same port. The npm install-script warning alone does not explain this failure when the build succeeds.
+
+Check the installed service and listener on the server:
+
+```sh
+systemctl show --property=WorkingDirectory --property=EnvironmentFiles tempo-clubrecords.service
+sudo journalctl -u tempo-clubrecords -n 100 --no-pager
+sudo ss -ltnp '( sport = :3000 or sport = :3001 )'
+curl --fail http://127.0.0.1:3001/api/health
+readlink -f /opt/tempo-clubrecords/current
+```
+
+The working directory must be `/opt/tempo-clubrecords/current` and the environment file must be
+`/opt/tempo-clubrecords/.env`. Apply unit edits with `sudo systemctl daemon-reload`.
+`current` must be a symlink to an existing release directory, never to itself. If it is broken, inspect
+`/opt/tempo-clubrecords/releases` and point it to a known working release before retrying. On a first installation
+with no working release, remove only the broken symlink so deployment can create the first one.
+
+Reinstall the updated deployment script; a GitHub push alone does not update the server's installed copy:
+
+```sh
+sudo -u tempo git -C /opt/tempo-clubrecords/repository pull --ff-only origin main
+sudo install -o root -g root -m 0755 /opt/tempo-clubrecords/repository/deploy/git-deploy.sh /usr/local/bin/tempo-deploy
+```
+
+Then rerun deployment for the tested commit.
 
 ### Fix `sudo: a password is required`
 

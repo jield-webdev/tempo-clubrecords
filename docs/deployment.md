@@ -6,7 +6,7 @@ These instructions target Ubuntu/Debian with systemd and a domain such as `recor
 and `deploy@your-server` with your own values. Run server commands as an account with sudo access. The examples host
 the application at the domain root, not under a URL subdirectory.
 
-Nginx terminates HTTPS and proxies the whole site to a single Node/Fastify process on `127.0.0.1:3000`. Fastify serves
+Nginx terminates HTTPS and proxies the whole site to a single Node/Fastify process on `127.0.0.1:3001`. Fastify serves
 the built React files and the API. SQLite lives in `/var/lib/tempo-clubrecords`, outside the application directory,
 so replacing the code does not replace the archive. No separate database server is required.
 
@@ -33,7 +33,7 @@ work with this service's `ProtectHome=true` setting. Ensure `sudo -u tempo node 
 find the intended installation too.
 
 Point the domain's DNS A record (and AAAA record if using IPv6) to the server. Allow inbound TCP ports **80 and 443**
-in the server/provider firewall, keeping your SSH access allowed. Port 3000 should remain private.
+in the server/provider firewall, keeping your SSH access allowed. Port 3001 should remain private.
 
 ## 2. Copy and build the application
 
@@ -67,7 +67,7 @@ Run `sudo editor /opt/tempo-clubrecords/.env` and save this content:
 ```dotenv
 NODE_ENV=production
 HOST=127.0.0.1
-PORT=3000
+PORT=3001
 DATABASE_PATH=/var/lib/tempo-clubrecords/tempo.sqlite
 COOKIE_SECURE=true
 ```
@@ -136,6 +136,10 @@ sudo systemctl enable --now tempo-clubrecords
 sudo systemctl status tempo-clubrecords --no-pager
 curl --fail http://127.0.0.1:3001/api/health
 ```
+
+The production examples use `PORT=3001`, matching `proxy_pass` in the supplied Nginx configuration.
+Set this explicitly in the production `.env`; the application defaults to port 3000 when `PORT` is absent.
+If you choose another port, update `.env`, Nginx and the manual health-check commands together.
 
 The health endpoint should return `{"ok":true}`. The service runs without root privileges, restarts after failures,
 starts on boot and can write only to its state directory and private temporary directory. Run only one application

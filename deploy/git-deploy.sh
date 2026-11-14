@@ -20,6 +20,12 @@ for action in restart stop; do
   fi
 done
 
+working_directory=$(systemctl show --property=WorkingDirectory --value tempo-clubrecords.service)
+[[ "$working_directory" == "$root/current" ]] || {
+  echo "Set WorkingDirectory=$root/current in tempo-clubrecords.service and run sudo systemctl daemon-reload." >&2
+  exit 1
+}
+
 # Also serialize manual deployments with Actions deployments.
 exec 9>"$root/.deploy.lock"
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
@@ -34,7 +40,14 @@ git merge-base --is-ancestor "$sha" FETCH_HEAD || {
   echo 'current must be a symlink.' >&2
   exit 1
 }
-previous=$(readlink -f "$root/current" || true)
+previous=
+if [[ -L "$root/current" ]]; then
+  [[ -d "$root/current" ]] || {
+    echo 'current must point to an existing release directory. Repair the symlink before deploying.' >&2
+    exit 1
+  }
+  previous=$(cd "$root/current" && pwd -P)
+fi
 release=$(mktemp -d "$root/releases/$sha.XXXXXX")
 switched=false
 
@@ -70,15 +83,31 @@ npm ci --include=dev
 npm run build
 ln -s "$root/.env" "$release/.env"
 chmod 755 "$release"
+# Match the service's EnvironmentFile without executing .env as shell code.
+health_url=$(node --input-type=module <<'NODE'
+import { readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
+const env = parseEnv(readFileSync('.env', 'utf8'));
+const port = Number(env.PORT || 3000);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid production PORT');
+let host = env.HOST || '127.0.0.1';
+if (host === '0.0.0.0') host = '127.0.0.1';
+if (host === '::') host = '::1';
+if (host.includes(':') && !host.startsWith('[')) host = `[${host}]`;
+console.log(new URL(`http://${host}:${port}/api/health`).href);
+NODE
+)
 switch_to "$release"
 switched=true
 sudo -n /usr/bin/systemctl restart tempo-clubrecords.service
+echo "Checking $health_url"
 for attempt in {1..30}; do
-  if curl --fail --silent --show-error --max-time 2 http://127.0.0.1:3001/api/health; then
+  if response=$(curl --noproxy '*' --fail --silent --show-error --max-time 2 "$health_url") &&
+    printf '%s' "$response" | node -e 'try { process.exit(JSON.parse(require("node:fs").readFileSync(0, "utf8")).ok === true ? 0 : 1); } catch { process.exit(1); }'; then
     echo "Deployed $sha"
     exit 0
   fi
   sleep 2
 done
-echo 'Health check failed.' >&2
+echo "Health check failed at $health_url. Check production HOST/PORT, the service log and Nginx proxy_pass." >&2
 exit 1

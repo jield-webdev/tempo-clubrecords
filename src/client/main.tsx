@@ -208,7 +208,7 @@ function App() {
                 <a href="#records" className="brand" aria-label="Tempo Valkenswaard, clubrecords">
                     <ClubLogo/>
                 </a>
-                <div className="sidebar-label">HET CLUBARCHIEF</div>
+                <div className="sidebar-label">HET CLUBARCHIEF 2</div>
                 <nav>
                     {nav.map(([id, label, Icon]) => (
                         <a
